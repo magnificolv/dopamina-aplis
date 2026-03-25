@@ -1421,8 +1421,11 @@ function updateCategory(idx, val) {
   refresh();
 }
 function deleteSource(idx) {
-  sources.splice(idx, 1);
-  refresh();
+  showConfirm(
+    `Dzēst avotu "${sources[idx].name}"?`,
+    'Šī darbība ir neatgriezeniska.',
+    () => { sources.splice(idx, 1); refresh(); }
+  );
 }
 function addSource() {
   sources.push({ name: 'Jauns avots', rawPct: 5, category: 'green', emoji: '🎯' });
@@ -1593,10 +1596,17 @@ function loadLive() {
   renderTimeline();
 }
 function deleteSnapshot(idx) {
-  snapshots.splice(idx, 1);
-  if (activeSnapshotIdx === idx) { activeSnapshotIdx = -1; renderPanel(sources); if(currentView==='3d') create3DPie(sources); }
-  else if (activeSnapshotIdx > idx) activeSnapshotIdx--;
-  saveData(); renderTimeline();
+  showConfirm(
+    `Dzēst momentuzņēmumu "${snapshots[idx].label}"?`,
+    'Šī darbība ir neatgriezeniska.',
+    () => {
+      snapshots.splice(idx, 1);
+      if (activeSnapshotIdx === idx) { activeSnapshotIdx = -1; renderPanel(sources); if(currentView==='3d') create3DPie(sources); }
+      else if (activeSnapshotIdx > idx) activeSnapshotIdx--;
+      saveData(); renderTimeline();
+      if (isMobile() && currentMobileTab === 'history') showMobileHistory();
+    }
+  );
 }
 
 // =============================================
