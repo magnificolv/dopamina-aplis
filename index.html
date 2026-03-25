@@ -463,9 +463,98 @@
 
   #import-input { display: none; }
 
+  /* ===== MOBILE TAB BAR ===== */
+  #mobile-tabs {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 56px;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    z-index: 100;
+    backdrop-filter: blur(20px);
+  }
+  .mobile-tab-row {
+    display: flex;
+    height: 100%;
+  }
+  .mobile-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .mobile-tab .tab-icon { font-size: 20px; }
+  .mobile-tab.active { color: var(--accent); }
+
+  /* ===== MOBILE ===== */
   @media (max-width: 768px) {
-    #panel { width: 100%; }
+    #topbar {
+      height: 48px;
+      padding: 0 12px;
+    }
+    #topbar h1 { font-size: 13px; letter-spacing: 1px; }
+    .topbar-left { gap: 10px; }
+    .view-toggle { display: none; } /* moved to mobile tabs */
+    .topbar-actions { gap: 4px; }
+    .topbar-actions .btn { padding: 6px 10px; font-size: 11px; }
+    .topbar-actions .btn-label { display: none; }
+
+    /* Canvas fills the screen */
+    #canvas-container, #canvas2d-container {
+      top: 48px;
+      height: calc(100vh - 48px - 56px);
+    }
+
+    /* Panel becomes full-screen overlay */
+    #panel {
+      position: fixed;
+      top: 48px;
+      left: 0; right: 0;
+      width: 100%;
+      height: calc(100vh - 48px - 56px);
+      transform: translateX(100%);
+      border-left: none;
+      z-index: 95;
+    }
+    #panel.mobile-visible {
+      transform: translateX(0);
+    }
     #panel-toggle { display: none; }
+
+    /* Center stats */
+    #center-stats {
+      left: 50%;
+      top: calc(48px + (100vh - 48px - 56px) / 2);
+    }
+
+    /* Timeline moves into panel or hidden */
+    #timeline { display: none; }
+
+    /* Mobile tabs visible */
+    #mobile-tabs { display: block; }
+
+    /* Source items compact */
+    .source-item { padding: 10px; }
+    .source-top { gap: 6px; }
+    .source-emoji { font-size: 16px; width: 24px; }
+    .source-name { font-size: 13px; }
+    .source-delete { opacity: 1; font-size: 14px; }
+
+    /* Modal */
+    .modal { min-width: auto; margin: 16px; }
+
+    /* Tooltip off on mobile */
+    #tooltip { display: none; }
   }
 </style>
 </head>
@@ -481,9 +570,9 @@
     </div>
   </div>
   <div class="topbar-actions">
-    <button class="btn" onclick="saveSnapshot()">📸 Saglabāt</button>
-    <button class="btn" onclick="exportJSON()">📤 Eksportēt</button>
-    <button class="btn" onclick="document.getElementById('import-input').click()">📥 Importēt</button>
+    <button class="btn" onclick="saveSnapshot()">📸 <span class="btn-label">Saglabāt</span></button>
+    <button class="btn" onclick="exportJSON()">📤 <span class="btn-label">Eksportēt</span></button>
+    <button class="btn" onclick="document.getElementById('import-input').click()">📥 <span class="btn-label">Importēt</span></button>
     <input type="file" id="import-input" accept=".json" onchange="importJSON(event)">
   </div>
 </div>
@@ -538,6 +627,24 @@
   <span class="timeline-label">📅 Vēsture:</span>
   <div class="timeline-snapshots" id="snapshots-list">
     <span style="font-size:12px; color:var(--text-dim)">Nav momentuzņēmumu. Nospied 📸 lai saglabātu.</span>
+  </div>
+</div>
+
+<!-- Mobile tab bar -->
+<div id="mobile-tabs">
+  <div class="mobile-tab-row">
+    <button class="mobile-tab active" data-mtab="wheel" onclick="setMobileTab('wheel')">
+      <span class="tab-icon">🎯</span>2D Aplis
+    </button>
+    <button class="mobile-tab" data-mtab="3d" onclick="setMobileTab('3d')">
+      <span class="tab-icon">🧊</span>3D Pīrāgs
+    </button>
+    <button class="mobile-tab" data-mtab="sources" onclick="setMobileTab('sources')">
+      <span class="tab-icon">📊</span>Avoti
+    </button>
+    <button class="mobile-tab" data-mtab="history" onclick="setMobileTab('history')">
+      <span class="tab-icon">📸</span>Vēsture
+    </button>
   </div>
 </div>
 
@@ -842,10 +949,15 @@ function drawWheel() {
   drawStarBackground(ctx, W, H);
 
   const srcs = getNormalized(getDisplaySources());
-  const panelW = document.getElementById('panel').classList.contains('hidden') ? 0 : 380;
+  const mobile = isMobile();
+  const panelVisible = !mobile && !document.getElementById('panel').classList.contains('hidden');
+  const panelW = panelVisible ? 380 : 0;
+  const topH = mobile ? 48 : 0;
+  const botH = mobile ? 56 : 0;
   const cx = (W - panelW) / 2;
-  const cy = H / 2;
-  const baseR = Math.min((W - panelW) / 2 - 40, (H - 160) / 2 - 20) * 0.72 * wheelZoom;
+  const cy = mobile ? topH + (H - topH - botH) / 2 : H / 2;
+  const availH = mobile ? (H - topH - botH) : H;
+  const baseR = Math.min((W - panelW) / 2 - 30, availH / 2 - 40) * (mobile ? 0.62 : 0.72) * wheelZoom;
   const innerR = baseR * 0.38;
   const outerR = baseR;
   const midR = (innerR + outerR) / 2;
@@ -911,7 +1023,8 @@ function drawWheel() {
     }
 
     // External labels with name + percentage
-    if (src.normPct >= 0.5) {
+    const minPctForLabel = mobile ? 2 : 0.5;
+    if (src.normPct >= minPctForLabel) {
       const lx = cx + Math.cos(midAngle) * labelR;
       const ly = cy + Math.sin(midAngle) * labelR;
 
@@ -923,7 +1036,8 @@ function drawWheel() {
       ctx.textBaseline = 'middle';
 
       // Name
-      const fontSize = Math.max(10, Math.min(13, 9 + src.normPct * 0.2)) * Math.min(wheelZoom, 1.3);
+      const fontBase = mobile ? Math.max(8, Math.min(11, 7 + src.normPct * 0.15)) : Math.max(10, Math.min(13, 9 + src.normPct * 0.2));
+      const fontSize = fontBase * Math.min(wheelZoom, 1.3);
       ctx.font = `500 ${fontSize}px Inter, sans-serif`;
       ctx.fillStyle = '#e2e8f0';
       const nameText = src.name;
@@ -983,14 +1097,17 @@ function drawWheel() {
   ctx.fillText('veselīgie avoti', cx, cy + innerR * 0.55);
 
   // Title at top
-  ctx.font = `900 ${20 * wheelZoom}px Orbitron, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  const titleGrd = ctx.createLinearGradient(cx - 150, 0, cx + 150, 0);
-  titleGrd.addColorStop(0, '#7c3aed');
-  titleGrd.addColorStop(1, '#06b6d4');
-  ctx.fillStyle = titleGrd;
-  ctx.fillText('MANS DOPAMĪNA APLIS', cx, 68);
+  // Title - skip on mobile (topbar already shows it)
+  if (!mobile) {
+    ctx.font = `900 ${20 * wheelZoom}px Orbitron, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    const titleGrd = ctx.createLinearGradient(cx - 150, 0, cx + 150, 0);
+    titleGrd.addColorStop(0, '#7c3aed');
+    titleGrd.addColorStop(1, '#06b6d4');
+    ctx.fillStyle = titleGrd;
+    ctx.fillText('MANS DOPAMĪNA APLIS', cx, 68);
+  }
 }
 
 // Star background for 2D
@@ -1331,6 +1448,91 @@ function togglePanel() {
 }
 
 // =============================================
+// MOBILE TABS
+// =============================================
+let currentMobileTab = 'wheel';
+
+function isMobile() {
+  return window.innerWidth <= 768;
+}
+
+function setMobileTab(tab) {
+  currentMobileTab = tab;
+  const panel = document.getElementById('panel');
+  const timeline = document.getElementById('timeline');
+
+  // Update tab buttons
+  document.querySelectorAll('.mobile-tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.mtab === tab);
+  });
+
+  if (tab === 'wheel') {
+    panel.classList.remove('mobile-visible');
+    setView('wheel');
+  } else if (tab === '3d') {
+    panel.classList.remove('mobile-visible');
+    setView('3d');
+  } else if (tab === 'sources') {
+    panel.classList.add('mobile-visible');
+  } else if (tab === 'history') {
+    panel.classList.remove('mobile-visible');
+    // Show timeline as overlay on mobile
+    showMobileHistory();
+  }
+}
+
+function showMobileHistory() {
+  // Reuse snapshot modal area or create simple overlay
+  let histEl = document.getElementById('mobile-history');
+  if (!histEl) {
+    histEl = document.createElement('div');
+    histEl.id = 'mobile-history';
+    histEl.style.cssText = 'position:fixed;top:48px;left:0;right:0;bottom:56px;background:var(--panel);z-index:95;overflow-y:auto;padding:16px;backdrop-filter:blur(20px);';
+    document.body.appendChild(histEl);
+  }
+  histEl.style.display = 'block';
+
+  const health = getHealthScore(getDisplaySources());
+  let html = '<h2 style="font-size:16px;margin-bottom:12px;">📅 Vēsture & Momentuzņēmumi</h2>';
+  html += `<div style="margin-bottom:16px;padding:12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;">
+    <div style="font-size:13px;color:var(--text-dim);margin-bottom:4px;">Pašreizējais veselības rādītājs</div>
+    <div style="font-size:28px;font-weight:900;font-family:Orbitron,sans-serif;color:${health>=60?'#22c55e':health>=40?'#eab308':'#ef4444'}">${health.toFixed(0)}%</div>
+  </div>`;
+  html += `<button class="btn primary" style="width:100%;margin-bottom:16px;" onclick="saveSnapshot()">📸 Saglabāt momentuzņēmumu</button>`;
+
+  if (snapshots.length === 0) {
+    html += '<p style="color:var(--text-dim);font-size:13px;text-align:center;padding:20px;">Nav momentuzņēmumu.</p>';
+  } else {
+    snapshots.forEach((snap, i) => {
+      const d = new Date(snap.date);
+      const ds = d.toLocaleDateString('lv-LV', { day:'numeric', month:'short', year:'numeric' });
+      const isActive = activeSnapshotIdx === i;
+      html += `<div style="padding:12px;margin-bottom:8px;background:${isActive?'rgba(124,58,237,0.2)':'rgba(255,255,255,0.03)'};border:1px solid ${isActive?'var(--accent)':'var(--border)'};border-radius:10px;cursor:pointer;" onclick="loadSnapshot(${i});if(isMobile())setMobileTab('wheel');">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-weight:600;font-size:14px;">${snap.label}</div>
+            <div style="font-size:12px;color:var(--text-dim);margin-top:2px;">${ds} — Veselība: ${snap.healthScore.toFixed(0)}%</div>
+          </div>
+          <button class="btn" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();deleteSnapshot(${i});showMobileHistory();">✕</button>
+        </div>
+        ${snap.note ? `<div style="font-size:12px;color:var(--text-dim);margin-top:6px;">${snap.note}</div>` : ''}
+      </div>`;
+    });
+  }
+
+  html += `<button class="btn" style="width:100%;margin-top:8px;" onclick="loadLive();if(isMobile())setMobileTab('wheel');">🔴 Atgriezties uz pašreizējo</button>`;
+  histEl.innerHTML = html;
+}
+
+// Hide mobile history when switching tabs
+const origSetMobileTab = setMobileTab;
+setMobileTab = function(tab) {
+  const histEl = document.getElementById('mobile-history');
+  if (histEl && tab !== 'history') histEl.style.display = 'none';
+  origSetMobileTab(tab);
+};
+
+// =============================================
 // SNAPSHOTS
 // =============================================
 function saveSnapshot() {
@@ -1435,6 +1637,12 @@ initWheel();
 renderPanel(sources);
 renderTimeline();
 setView('wheel'); // Start with 2D wheel
+
+// On mobile, ensure panel starts hidden
+if (isMobile()) {
+  document.getElementById('panel').classList.remove('hidden');
+  // Panel will only show when "Avoti" tab is tapped
+}
 
 // Lazy init Three.js only when needed
 animate3D();
