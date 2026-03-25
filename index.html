@@ -1,0 +1,1448 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mans Dopamīna Aplis</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#7c3aed">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dopamīna Aplis">
+<link rel="apple-touch-icon" href="icons/icon-192.svg">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a1a;
+    --panel: rgba(15, 15, 35, 0.92);
+    --border: rgba(100, 100, 255, 0.15);
+    --accent: #7c3aed;
+    --accent2: #06b6d4;
+    --red: #ef4444;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --glow: 0 0 20px rgba(124, 58, 237, 0.3);
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ===== CANVAS CONTAINERS ===== */
+  #canvas-container, #canvas2d-container {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+  }
+  #canvas2d-container { display: none; }
+  #canvas2d-container canvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ===== TOP BAR ===== */
+  #topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    z-index: 100;
+    backdrop-filter: blur(20px);
+  }
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  #topbar h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #7c3aed, #06b6d4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 2px;
+  }
+  .topbar-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  /* View toggle */
+  .view-toggle {
+    display: flex;
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .view-btn {
+    padding: 6px 14px;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .view-btn:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+  .view-btn.active {
+    background: var(--accent);
+    color: white;
+  }
+
+  /* ===== BUTTONS ===== */
+  .btn {
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    background: rgba(124, 58, 237, 0.1);
+    color: var(--text);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.2s;
+  }
+  .btn:hover { background: rgba(124, 58, 237, 0.25); border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); }
+  .btn.primary:hover { background: #6d28d9; }
+
+  /* ===== SIDE PANEL ===== */
+  #panel {
+    position: fixed;
+    top: 56px;
+    right: 0;
+    width: 380px;
+    height: calc(100vh - 56px - 80px);
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    z-index: 90;
+    backdrop-filter: blur(20px);
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.3s ease;
+  }
+  #panel.hidden { transform: translateX(100%); }
+  #panel-toggle {
+    position: fixed;
+    right: 380px;
+    top: 70px;
+    z-index: 91;
+    width: 32px; height: 32px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+    cursor: pointer;
+    color: var(--text);
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: right 0.3s ease;
+  }
+  #panel.hidden ~ #panel-toggle { right: 0; }
+
+  .panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .panel-header h2 { font-size: 15px; font-weight: 600; }
+  .panel-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+  }
+  .panel-scroll::-webkit-scrollbar { width: 6px; }
+  .panel-scroll::-webkit-scrollbar-track { background: transparent; }
+  .panel-scroll::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.3); border-radius: 3px; }
+
+  /* ===== SOURCE ITEMS ===== */
+  .source-item {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 8px;
+    transition: all 0.2s;
+  }
+  .source-item:hover { border-color: rgba(124, 58, 237, 0.4); }
+  .source-item.highlight { border-color: var(--accent); box-shadow: var(--glow); }
+  .source-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .source-emoji {
+    font-size: 18px;
+    cursor: pointer;
+    width: 28px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .source-name {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    outline: none;
+    font-family: 'Inter', sans-serif;
+    min-width: 0;
+  }
+  .cat-select {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+  }
+  .cat-select option { background: #1a1a2e; }
+  .source-delete {
+    background: none; border: none;
+    color: var(--text-dim);
+    cursor: pointer; font-size: 16px;
+    padding: 2px 4px;
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .source-item:hover .source-delete { opacity: 1; }
+  .source-delete:hover { color: var(--red); }
+  .source-bottom {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .source-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.1);
+    outline: none;
+  }
+  .source-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(124,58,237,0.5);
+  }
+  .source-pct-input {
+    width: 55px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 13px;
+    text-align: center;
+    border-radius: 6px;
+    padding: 4px;
+    font-family: 'Inter', sans-serif;
+  }
+  .source-normalized {
+    font-size: 12px;
+    color: var(--text-dim);
+    min-width: 50px;
+    text-align: right;
+  }
+  .add-source-btn {
+    width: 100%;
+    padding: 10px;
+    border: 2px dashed var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.2s;
+    margin-top: 4px;
+  }
+  .add-source-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .totals-bar {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    background: rgba(0,0,0,0.3);
+  }
+  .totals-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+  .totals-row .label { color: var(--text-dim); }
+  .totals-row .value { font-weight: 600; }
+
+  /* ===== CENTER STATS ===== */
+  #center-stats {
+    position: fixed;
+    top: 50%;
+    left: calc(50% - 190px);
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 50;
+    pointer-events: none;
+  }
+  #center-stats .big-pct {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--text-dim);
+    letter-spacing: 3px;
+  }
+  #center-stats .health-score {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 36px;
+    font-weight: 900;
+    margin-top: 4px;
+  }
+  #center-stats .health-label {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    letter-spacing: 1px;
+  }
+
+  /* ===== TIMELINE ===== */
+  #timeline {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 80px;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    z-index: 90;
+    backdrop-filter: blur(20px);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 16px;
+  }
+  .timeline-label {
+    font-size: 12px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .timeline-snapshots {
+    flex: 1;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 8px 0;
+    align-items: center;
+  }
+  .timeline-snapshots::-webkit-scrollbar { height: 4px; }
+  .timeline-snapshots::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.3); border-radius: 2px; }
+  .snapshot-chip {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: rgba(255,255,255,0.03);
+    white-space: nowrap;
+  }
+  .snapshot-chip:hover { border-color: var(--accent); }
+  .snapshot-chip.active { background: var(--accent); border-color: var(--accent); }
+  .snapshot-chip .snap-date { font-weight: 600; }
+  .snapshot-chip .snap-label { color: var(--text-dim); margin-left: 6px; }
+  .snapshot-chip.active .snap-label { color: rgba(255,255,255,0.7); }
+  .snapshot-delete {
+    margin-left: 6px;
+    background: none; border: none;
+    color: rgba(255,255,255,0.4);
+    cursor: pointer; font-size: 14px;
+  }
+  .snapshot-delete:hover { color: var(--red); }
+
+  /* ===== TOOLTIP ===== */
+  #tooltip {
+    position: fixed;
+    background: rgba(15, 15, 35, 0.95);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 200;
+    backdrop-filter: blur(10px);
+    max-width: 220px;
+  }
+  #tooltip.visible { opacity: 1; }
+  #tooltip .tt-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  #tooltip .tt-pct { font-size: 20px; font-weight: 700; }
+  #tooltip .tt-raw { font-size: 11px; color: var(--text-dim); }
+
+  /* ===== MODAL ===== */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.hidden { display: none; }
+  .modal {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    min-width: 320px;
+    max-width: 450px;
+  }
+  .modal h3 { margin-bottom: 16px; font-size: 16px; }
+  .modal input[type="text"], .modal textarea {
+    width: 100%; padding: 10px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+  .modal textarea { height: 80px; resize: vertical; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* Emoji picker mini */
+  .emoji-picker {
+    position: absolute;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+    z-index: 150;
+    max-height: 200px;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  .emoji-picker.hidden { display: none; }
+  .emoji-opt {
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border-radius: 6px;
+    font-size: 18px;
+    transition: background 0.15s;
+  }
+  .emoji-opt:hover { background: rgba(124,58,237,0.3); }
+
+  #import-input { display: none; }
+
+  @media (max-width: 768px) {
+    #panel { width: 100%; }
+    #panel-toggle { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="topbar-left">
+    <h1>DOPAMĪNA APLIS</h1>
+    <div class="view-toggle">
+      <button class="view-btn active" data-view="wheel" onclick="setView('wheel')">🎯 2D Aplis</button>
+      <button class="view-btn" data-view="3d" onclick="setView('3d')">🧊 3D Pīrāgs</button>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn" onclick="saveSnapshot()">📸 Saglabāt</button>
+    <button class="btn" onclick="exportJSON()">📤 Eksportēt</button>
+    <button class="btn" onclick="document.getElementById('import-input').click()">📥 Importēt</button>
+    <input type="file" id="import-input" accept=".json" onchange="importJSON(event)">
+  </div>
+</div>
+
+<!-- 3D container -->
+<div id="canvas-container"></div>
+
+<!-- 2D Wheel container -->
+<div id="canvas2d-container">
+  <canvas id="wheel-canvas"></canvas>
+</div>
+
+<!-- Center stats (only for 3D view) -->
+<div id="center-stats">
+  <div class="big-pct">VESELĪBAS RĀDĪTĀJS</div>
+  <div class="health-score" id="health-score">0%</div>
+  <div class="health-label">zaļie avoti no kopējā</div>
+</div>
+
+<!-- Tooltip -->
+<div id="tooltip">
+  <div class="tt-name"></div>
+  <div class="tt-pct"></div>
+  <div class="tt-raw"></div>
+</div>
+
+<!-- Side panel -->
+<div id="panel">
+  <div class="panel-header">
+    <h2>Dopamīna avoti</h2>
+    <span id="source-count" style="font-size:12px; color:var(--text-dim)"></span>
+  </div>
+  <div class="panel-scroll" id="sources-list"></div>
+  <div style="padding: 0 12px 12px 12px;">
+    <button class="add-source-btn" onclick="addSource()">+ Pievienot avotu</button>
+  </div>
+  <div class="totals-bar">
+    <div class="totals-row">
+      <span class="label">Ievadītā summa:</span>
+      <span class="value" id="raw-total">0%</span>
+    </div>
+    <div class="totals-row">
+      <span class="label">Koriģētā summa:</span>
+      <span class="value" style="color: var(--green)" id="norm-total">100%</span>
+    </div>
+  </div>
+</div>
+<button id="panel-toggle" onclick="togglePanel()">◀</button>
+
+<!-- Timeline -->
+<div id="timeline">
+  <span class="timeline-label">📅 Vēsture:</span>
+  <div class="timeline-snapshots" id="snapshots-list">
+    <span style="font-size:12px; color:var(--text-dim)">Nav momentuzņēmumu. Nospied 📸 lai saglabātu.</span>
+  </div>
+</div>
+
+<!-- Snapshot modal -->
+<div class="modal-overlay hidden" id="snapshot-modal">
+  <div class="modal">
+    <h3>📸 Saglabāt momentuzņēmumu</h3>
+    <input type="text" id="snapshot-label" placeholder="Nosaukums (piem. 'Sākuma stāvoklis')">
+    <textarea id="snapshot-note" placeholder="Piezīmes (neobligāti)..."></textarea>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeSnapshotModal()">Atcelt</button>
+      <button class="btn primary" onclick="confirmSnapshot()">Saglabāt</button>
+    </div>
+  </div>
+</div>
+
+<!-- Emoji picker (shared) -->
+<div class="emoji-picker hidden" id="emoji-picker"></div>
+
+<script>
+// =============================================
+// DATA
+// =============================================
+const CATEGORY_COLORS = {
+  red: { color: '#ef4444', label: 'Kaitīgs' },
+  yellow: { color: '#eab308', label: 'Neitrāls' },
+  green: { color: '#22c55e', label: 'Veselīgs' }
+};
+
+// Distinct colors for each segment
+const SEGMENT_COLORS = [
+  '#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899',
+  '#14b8a6','#f43f5e','#84cc16','#a855f7','#0ea5e9','#d946ef','#10b981','#f59e0b',
+  '#6366f1','#fb923c','#2dd4bf','#e879f9','#4ade80','#38bdf8'
+];
+
+const EMOJI_LIST = [
+  '🚬','🍩','📱','💻','🔞','🌿','🏋️','❤️','🎮','🍝',
+  '👩‍❤️‍👨','🧘','🤝','🎨','👨‍👧‍👦','🎵','💬','✈️','📚','🍺',
+  '☕','🎬','🐕','🏃','🧠','💊','🎯','🔥','💰','🌊',
+  '🏠','🎸','📝','🌱','😴','🍎','🛒','🎧','🖥️','⚽'
+];
+
+const DEFAULT_SOURCES = [
+  { name: 'nikotīns', rawPct: 20, category: 'red', emoji: '🚬' },
+  { name: 'saldumi', rawPct: 20, category: 'red', emoji: '🍩' },
+  { name: 'youtube/twitter', rawPct: 15, category: 'yellow', emoji: '📱' },
+  { name: 'Programmēšana', rawPct: 10, category: 'green', emoji: '💻' },
+  { name: 'Porn', rawPct: 10, category: 'red', emoji: '🔞' },
+  { name: 'weed', rawPct: 10, category: 'red', emoji: '🌿' },
+  { name: 'Gym & fitness', rawPct: 10, category: 'green', emoji: '🏋️' },
+  { name: 'fiziska tuvība/sex', rawPct: 5, category: 'green', emoji: '❤️' },
+  { name: 'game', rawPct: 5, category: 'yellow', emoji: '🎮' },
+  { name: 'ēdiens', rawPct: 5, category: 'yellow', emoji: '🍝' },
+  { name: 'mīlums no sievas', rawPct: 5, category: 'green', emoji: '👩‍❤️‍👨' },
+  { name: 'meditācija', rawPct: 3, category: 'green', emoji: '🧘' },
+  { name: 'connection ar human', rawPct: 2, category: 'green', emoji: '🤝' },
+  { name: 'mākslas radīšana', rawPct: 1, category: 'green', emoji: '🎨' },
+  { name: 'mīlums no bērniem', rawPct: 1, category: 'green', emoji: '👨‍👧‍👦' },
+  { name: 'mūzika', rawPct: 1, category: 'green', emoji: '🎵' },
+  { name: 'dziļas sarunas', rawPct: 0.5, category: 'green', emoji: '💬' },
+  { name: 'ceļošana / piedzīvojumi', rawPct: 0, category: 'green', emoji: '✈️' }
+];
+
+let sources = [];
+let snapshots = [];
+let activeSnapshotIdx = -1;
+let currentView = 'wheel'; // 'wheel' or '3d'
+
+// =============================================
+// LOAD / SAVE
+// =============================================
+function loadData() {
+  try {
+    const saved = localStorage.getItem('dopamina-aplis-sources');
+    if (saved) {
+      sources = JSON.parse(saved);
+      // Ensure emoji field exists
+      sources.forEach((s, i) => {
+        if (!s.emoji) {
+          const def = DEFAULT_SOURCES.find(d => d.name === s.name);
+          s.emoji = def ? def.emoji : '🎯';
+        }
+      });
+    } else {
+      sources = JSON.parse(JSON.stringify(DEFAULT_SOURCES));
+    }
+    const savedSnaps = localStorage.getItem('dopamina-aplis-snapshots');
+    if (savedSnaps) snapshots = JSON.parse(savedSnaps);
+  } catch(e) {
+    sources = JSON.parse(JSON.stringify(DEFAULT_SOURCES));
+    snapshots = [];
+  }
+}
+
+function saveData() {
+  localStorage.setItem('dopamina-aplis-sources', JSON.stringify(sources));
+  localStorage.setItem('dopamina-aplis-snapshots', JSON.stringify(snapshots));
+}
+
+function getNormalized(srcs) {
+  const total = srcs.reduce((s, src) => s + src.rawPct, 0);
+  if (total === 0) return srcs.map(s => ({ ...s, normPct: 0 }));
+  return srcs.map(s => ({ ...s, normPct: (s.rawPct / total) * 100 }));
+}
+
+function getHealthScore(srcs) {
+  const normed = getNormalized(srcs);
+  return normed.reduce((s, src) => s + (src.category === 'green' ? src.normPct : 0), 0);
+}
+
+function getDisplaySources() {
+  if (activeSnapshotIdx >= 0 && snapshots[activeSnapshotIdx]) {
+    return snapshots[activeSnapshotIdx].sources;
+  }
+  return sources;
+}
+
+// =============================================
+// VIEW SWITCHING
+// =============================================
+function setView(view) {
+  currentView = view;
+  document.querySelectorAll('.view-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.view === view);
+  });
+
+  const c3d = document.getElementById('canvas-container');
+  const c2d = document.getElementById('canvas2d-container');
+  const stats = document.getElementById('center-stats');
+
+  if (view === '3d') {
+    c3d.style.display = 'block';
+    c2d.style.display = 'none';
+    stats.style.display = 'block';
+    create3DPie(getDisplaySources());
+  } else {
+    c3d.style.display = 'none';
+    c2d.style.display = 'block';
+    stats.style.display = 'none';
+    drawWheel();
+  }
+}
+
+// =============================================
+// 2D WHEEL VISUALIZATION
+// =============================================
+let wheelCanvas, wheelCtx;
+let wheelRotation = 0, wheelTargetRotation = 0;
+let wheelZoom = 1, wheelTargetZoom = 1;
+let wheelDragging = false, wheelDragStartX = 0, wheelDragStartRot = 0;
+let wheelHovered = -1;
+let wheelAnimFrame;
+
+function initWheel() {
+  wheelCanvas = document.getElementById('wheel-canvas');
+  wheelCtx = wheelCanvas.getContext('2d');
+  resizeWheelCanvas();
+
+  wheelCanvas.addEventListener('mousedown', onWheelMouseDown);
+  wheelCanvas.addEventListener('mousemove', onWheelMouseMove);
+  wheelCanvas.addEventListener('mouseup', onWheelMouseUp);
+  wheelCanvas.addEventListener('mouseleave', onWheelMouseUp);
+  wheelCanvas.addEventListener('wheel', onWheelScroll, { passive: false });
+  // Touch
+  wheelCanvas.addEventListener('touchstart', onWheelTouchStart, { passive: false });
+  wheelCanvas.addEventListener('touchmove', onWheelTouchMove, { passive: false });
+  wheelCanvas.addEventListener('touchend', onWheelTouchEnd);
+  window.addEventListener('resize', resizeWheelCanvas);
+
+  animateWheel();
+}
+
+function resizeWheelCanvas() {
+  const dpr = Math.min(window.devicePixelRatio, 2);
+  wheelCanvas.width = window.innerWidth * dpr;
+  wheelCanvas.height = window.innerHeight * dpr;
+  wheelCanvas.style.width = window.innerWidth + 'px';
+  wheelCanvas.style.height = window.innerHeight + 'px';
+  wheelCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function onWheelMouseDown(e) {
+  wheelDragging = true;
+  wheelDragStartX = e.clientX;
+  wheelDragStartRot = wheelTargetRotation;
+}
+function onWheelMouseMove(e) {
+  if (wheelDragging) {
+    const dx = e.clientX - wheelDragStartX;
+    wheelTargetRotation = wheelDragStartRot + dx * 0.003;
+  }
+  // Hover detection
+  checkWheelHover(e.clientX, e.clientY);
+}
+function onWheelMouseUp() { wheelDragging = false; }
+function onWheelScroll(e) {
+  e.preventDefault();
+  wheelTargetZoom = Math.max(0.5, Math.min(2.5, wheelTargetZoom - e.deltaY * 0.001));
+}
+
+let wheelTouchDist = 0;
+function onWheelTouchStart(e) {
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    wheelDragging = true;
+    wheelDragStartX = e.touches[0].clientX;
+    wheelDragStartRot = wheelTargetRotation;
+  } else if (e.touches.length === 2) {
+    wheelTouchDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+  }
+}
+function onWheelTouchMove(e) {
+  e.preventDefault();
+  if (e.touches.length === 1 && wheelDragging) {
+    const dx = e.touches[0].clientX - wheelDragStartX;
+    wheelTargetRotation = wheelDragStartRot + dx * 0.003;
+  } else if (e.touches.length === 2) {
+    const dist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    wheelTargetZoom = Math.max(0.5, Math.min(2.5, wheelTargetZoom + (dist - wheelTouchDist) * 0.005));
+    wheelTouchDist = dist;
+  }
+}
+function onWheelTouchEnd() { wheelDragging = false; }
+
+function checkWheelHover(mx, my) {
+  const srcs = getNormalized(getDisplaySources());
+  const panelW = document.getElementById('panel').classList.contains('hidden') ? 0 : 380;
+  const cx = (window.innerWidth - panelW) / 2;
+  const cy = window.innerHeight / 2;
+  const baseR = Math.min(cx, cy - 80) * 0.7 * wheelZoom;
+  const innerR = baseR * 0.35;
+  const outerR = baseR;
+
+  const dx = mx - cx;
+  const dy = my - cy;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  let angle = Math.atan2(dy, dx) - wheelRotation;
+  angle = ((angle % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
+
+  const tooltip = document.getElementById('tooltip');
+
+  if (dist >= innerR && dist <= outerR * 1.15) {
+    let cumAngle = 0;
+    let found = -1;
+    for (let i = 0; i < srcs.length; i++) {
+      if (srcs[i].normPct <= 0) continue;
+      const sweep = (srcs[i].normPct / 100) * Math.PI * 2;
+      if (angle >= cumAngle && angle < cumAngle + sweep) {
+        found = i;
+        break;
+      }
+      cumAngle += sweep;
+    }
+    if (found >= 0 && found !== wheelHovered) {
+      wheelHovered = found;
+      const src = srcs[found];
+      tooltip.querySelector('.tt-name').textContent = src.emoji + ' ' + src.name;
+      tooltip.querySelector('.tt-pct').textContent = src.normPct.toFixed(1) + '%';
+      tooltip.querySelector('.tt-raw').textContent = 'Ievadītais: ' + src.rawPct + '% | ' + CATEGORY_COLORS[src.category].label;
+      document.querySelectorAll('.source-item').forEach((el, i) => el.classList.toggle('highlight', i === found));
+    }
+    if (found >= 0) {
+      tooltip.style.left = (mx + 16) + 'px';
+      tooltip.style.top = (my - 16) + 'px';
+      tooltip.classList.add('visible');
+      wheelCanvas.style.cursor = 'pointer';
+    } else {
+      tooltip.classList.remove('visible');
+      wheelHovered = -1;
+      wheelCanvas.style.cursor = wheelDragging ? 'grabbing' : 'grab';
+      document.querySelectorAll('.source-item').forEach(el => el.classList.remove('highlight'));
+    }
+  } else {
+    tooltip.classList.remove('visible');
+    wheelHovered = -1;
+    wheelCanvas.style.cursor = wheelDragging ? 'grabbing' : 'grab';
+    document.querySelectorAll('.source-item').forEach(el => el.classList.remove('highlight'));
+  }
+}
+
+function animateWheel() {
+  wheelRotation += (wheelTargetRotation - wheelRotation) * 0.08;
+  wheelZoom += (wheelTargetZoom - wheelZoom) * 0.08;
+  if (currentView === 'wheel') drawWheel();
+  wheelAnimFrame = requestAnimationFrame(animateWheel);
+}
+
+function drawWheel() {
+  const ctx = wheelCtx;
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  drawStarBackground(ctx, W, H);
+
+  const srcs = getNormalized(getDisplaySources());
+  const panelW = document.getElementById('panel').classList.contains('hidden') ? 0 : 380;
+  const cx = (W - panelW) / 2;
+  const cy = H / 2;
+  const baseR = Math.min((W - panelW) / 2 - 40, (H - 160) / 2 - 20) * 0.72 * wheelZoom;
+  const innerR = baseR * 0.38;
+  const outerR = baseR;
+  const midR = (innerR + outerR) / 2;
+
+  // Draw segments
+  let angle = wheelRotation;
+  srcs.forEach((src, i) => {
+    if (src.normPct <= 0) return;
+    const sweep = (src.normPct / 100) * Math.PI * 2;
+    const color = SEGMENT_COLORS[i % SEGMENT_COLORS.length];
+    const isHovered = (i === wheelHovered);
+
+    // Outer glow for hovered
+    if (isHovered) {
+      ctx.save();
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 25;
+    }
+
+    // Segment
+    ctx.beginPath();
+    ctx.arc(cx, cy, isHovered ? outerR + 6 : outerR, angle, angle + sweep);
+    ctx.arc(cx, cy, innerR, angle + sweep, angle, true);
+    ctx.closePath();
+
+    // Gradient fill
+    const grd = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
+    const c = hexToRgb(color);
+    grd.addColorStop(0, `rgba(${c.r},${c.g},${c.b},0.85)`);
+    grd.addColorStop(1, `rgba(${c.r},${c.g},${c.b},${isHovered ? 1 : 0.92})`);
+    ctx.fillStyle = grd;
+    ctx.fill();
+
+    // Segment border
+    ctx.strokeStyle = isHovered ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = isHovered ? 2 : 1;
+    ctx.stroke();
+
+    if (isHovered) ctx.restore();
+
+    // Category indicator ring (thin inner border)
+    const catColor = CATEGORY_COLORS[src.category].color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, innerR + 3, angle + 0.01, angle + sweep - 0.01);
+    ctx.strokeStyle = catColor;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // === Labels ===
+    const midAngle = angle + sweep / 2;
+    const labelR = outerR + 20 * wheelZoom;
+    const emojiR = midR;
+
+    // Emoji in segment
+    if (sweep > 0.08) {
+      const ex = cx + Math.cos(midAngle) * emojiR;
+      const ey = cy + Math.sin(midAngle) * emojiR;
+      const emojiSize = Math.min(28, Math.max(14, sweep * baseR * 0.25)) * wheelZoom;
+      ctx.font = `${emojiSize}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(src.emoji, ex, ey);
+    }
+
+    // External labels with name + percentage
+    if (src.normPct >= 0.5) {
+      const lx = cx + Math.cos(midAngle) * labelR;
+      const ly = cy + Math.sin(midAngle) * labelR;
+
+      // Determine alignment based on angle
+      const normAngle = ((midAngle % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
+      const isRight = normAngle < Math.PI/2 || normAngle > Math.PI*3/2;
+
+      ctx.textAlign = isRight ? 'left' : 'right';
+      ctx.textBaseline = 'middle';
+
+      // Name
+      const fontSize = Math.max(10, Math.min(13, 9 + src.normPct * 0.2)) * Math.min(wheelZoom, 1.3);
+      ctx.font = `500 ${fontSize}px Inter, sans-serif`;
+      ctx.fillStyle = '#e2e8f0';
+      const nameText = src.name;
+      ctx.fillText(nameText, lx, ly - fontSize * 0.55);
+
+      // Percentage
+      ctx.font = `700 ${fontSize * 1.1}px Orbitron, Inter, sans-serif`;
+      ctx.fillStyle = color;
+      ctx.fillText(src.normPct.toFixed(1) + '%', lx, ly + fontSize * 0.55);
+
+      // Connector line
+      const lineStart = outerR + 4;
+      const lineEnd = labelR - 6;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(midAngle) * lineStart, cy + Math.sin(midAngle) * lineStart);
+      ctx.lineTo(cx + Math.cos(midAngle) * lineEnd, cy + Math.sin(midAngle) * lineEnd);
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    angle += sweep;
+  });
+
+  // Center brain circle
+  // Dark circle
+  const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, innerR);
+  gradient.addColorStop(0, '#1a1a3e');
+  gradient.addColorStop(0.7, '#0f0f2a');
+  gradient.addColorStop(1, '#0a0a1a');
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerR - 2, 0, Math.PI * 2);
+  ctx.fillStyle = gradient;
+  ctx.fill();
+
+  // Glowing ring around center
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerR - 1, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(124, 58, 237, 0.4)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Brain emoji + health score in center
+  const brainSize = innerR * 0.5;
+  ctx.font = `${brainSize}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🧠', cx, cy - innerR * 0.12);
+
+  const health = getHealthScore(getDisplaySources());
+  ctx.font = `700 ${innerR * 0.22}px Orbitron, sans-serif`;
+  ctx.fillStyle = health >= 60 ? '#22c55e' : health >= 40 ? '#eab308' : '#ef4444';
+  ctx.fillText(health.toFixed(0) + '%', cx, cy + innerR * 0.35);
+
+  ctx.font = `400 ${innerR * 0.11}px Inter, sans-serif`;
+  ctx.fillStyle = '#94a3b8';
+  ctx.fillText('veselīgie avoti', cx, cy + innerR * 0.55);
+
+  // Title at top
+  ctx.font = `900 ${20 * wheelZoom}px Orbitron, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  const titleGrd = ctx.createLinearGradient(cx - 150, 0, cx + 150, 0);
+  titleGrd.addColorStop(0, '#7c3aed');
+  titleGrd.addColorStop(1, '#06b6d4');
+  ctx.fillStyle = titleGrd;
+  ctx.fillText('MANS DOPAMĪNA APLIS', cx, 68);
+}
+
+// Star background for 2D
+let stars2D = [];
+function initStars2D() {
+  for (let i = 0; i < 200; i++) {
+    stars2D.push({
+      x: Math.random(),
+      y: Math.random(),
+      size: Math.random() * 1.5 + 0.3,
+      alpha: Math.random() * 0.5 + 0.1
+    });
+  }
+}
+initStars2D();
+
+function drawStarBackground(ctx, W, H) {
+  // Dark gradient background
+  const bg = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W,H)*0.7);
+  bg.addColorStop(0, '#12122a');
+  bg.addColorStop(1, '#0a0a1a');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Stars
+  stars2D.forEach(s => {
+    ctx.beginPath();
+    ctx.arc(s.x * W, s.y * H, s.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(180, 180, 255, ${s.alpha})`;
+    ctx.fill();
+  });
+}
+
+function hexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : {r:255,g:255,b:255};
+}
+
+// =============================================
+// THREE.JS 3D SETUP
+// =============================================
+let scene, camera, renderer, segments3D = [];
+let mouseX = 0, mouseY = 0;
+let targetRotX = 0.3, targetRotY = 0, currentRotX = 0.3, currentRotY = 0;
+let isDragging = false, dragStartX = 0, dragStartY = 0, dragStartRotX = 0, dragStartRotY = 0;
+let targetZoom = 5.5, currentZoom = 5.5;
+let starField, hoveredSegment = -1;
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let threeInited = false;
+
+function initThree() {
+  if (threeInited) return;
+  threeInited = true;
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(0, 2, currentZoom);
+  camera.lookAt(0, 0, 0);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
+  document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+  scene.add(new THREE.AmbientLight(0x404060, 0.8));
+  const dl = new THREE.DirectionalLight(0xffffff, 1.0);
+  dl.position.set(5, 8, 5);
+  scene.add(dl);
+  const pl = new THREE.PointLight(0x7c3aed, 2, 15);
+  pl.position.set(0, 3, 0);
+  scene.add(pl);
+  const pl2 = new THREE.PointLight(0x06b6d4, 1.5, 15);
+  pl2.position.set(-3, -1, 3);
+  scene.add(pl2);
+
+  // Stars
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(2000 * 3);
+  for (let i = 0; i < 2000; i++) {
+    positions[i*3] = (Math.random()-0.5)*80;
+    positions[i*3+1] = (Math.random()-0.5)*80;
+    positions[i*3+2] = (Math.random()-0.5)*80;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  starField = new THREE.Points(geo, new THREE.PointsMaterial({
+    color: 0xaaaaff, size: 0.08, transparent: true, opacity: 0.6, sizeAttenuation: true
+  }));
+  scene.add(starField);
+
+  const canvas = renderer.domElement;
+  canvas.addEventListener('mousedown', on3DMouseDown);
+  canvas.addEventListener('mousemove', on3DMouseMove);
+  canvas.addEventListener('mouseup', () => isDragging = false);
+  canvas.addEventListener('wheel', e => { e.preventDefault(); targetZoom = Math.max(3, Math.min(12, targetZoom + e.deltaY * 0.003)); }, { passive: false });
+  window.addEventListener('resize', () => {
+    if (!renderer) return;
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+}
+
+function on3DMouseDown(e) {
+  isDragging = true;
+  dragStartX = e.clientX; dragStartY = e.clientY;
+  dragStartRotX = targetRotX; dragStartRotY = targetRotY;
+}
+function on3DMouseMove(e) {
+  mouseX = e.clientX; mouseY = e.clientY;
+  if (isDragging) {
+    targetRotY = dragStartRotY + (e.clientX - dragStartX) * 0.005;
+    targetRotX = Math.max(-0.5, Math.min(1.2, dragStartRotX + (e.clientY - dragStartY) * 0.005));
+  }
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  check3DHover();
+}
+
+function check3DHover() {
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(segments3D);
+  const tooltip = document.getElementById('tooltip');
+  if (intersects.length > 0) {
+    const obj = intersects[0].object;
+    const src = obj.userData.source;
+    const idx = obj.userData.index;
+    if (hoveredSegment !== idx) {
+      segments3D.forEach(s => { if(s.material){ s.material.emissiveIntensity=0.15; s.material.opacity=0.92; }});
+      obj.material.emissiveIntensity = 0.5;
+      obj.material.opacity = 1.0;
+      hoveredSegment = idx;
+      document.querySelectorAll('.source-item').forEach((el,i)=>el.classList.toggle('highlight',i===idx));
+    }
+    tooltip.querySelector('.tt-name').textContent = (src.emoji||'') + ' ' + src.name;
+    tooltip.querySelector('.tt-pct').textContent = src.normPct.toFixed(1) + '%';
+    tooltip.querySelector('.tt-raw').textContent = 'Ievadītais: ' + src.rawPct + '% | ' + CATEGORY_COLORS[src.category].label;
+    tooltip.style.left = (mouseX+16)+'px';
+    tooltip.style.top = (mouseY-16)+'px';
+    tooltip.classList.add('visible');
+    renderer.domElement.style.cursor = 'pointer';
+  } else {
+    if (hoveredSegment !== -1) {
+      segments3D.forEach(s => { if(s.material){ s.material.emissiveIntensity=0.15; s.material.opacity=0.92; }});
+      hoveredSegment = -1;
+      document.querySelectorAll('.source-item').forEach(el=>el.classList.remove('highlight'));
+    }
+    tooltip.classList.remove('visible');
+    renderer.domElement.style.cursor = 'grab';
+  }
+}
+
+function create3DPie(srcs) {
+  if (!threeInited) initThree();
+  segments3D.forEach(s => scene.remove(s));
+  segments3D = [];
+  const normed = getNormalized(srcs);
+  let angle = -Math.PI / 2;
+  const radius = 2.0, height = 0.5, gap = 0.015;
+
+  normed.forEach((src, i) => {
+    if (src.normPct <= 0) return;
+    const sweep = (src.normPct / 100) * Math.PI * 2;
+    const color = new THREE.Color(SEGMENT_COLORS[i % SEGMENT_COLORS.length]);
+    const segH = height + (src.normPct / 100) * 0.8;
+
+    const shape = new THREE.Shape();
+    const segs = Math.max(16, Math.floor(sweep / 0.05));
+    shape.moveTo(0, 0);
+    for (let j = 0; j <= segs; j++) {
+      const a = angle + (sweep * j / segs);
+      shape.lineTo(Math.cos(a) * radius, Math.sin(a) * radius);
+    }
+    shape.lineTo(0, 0);
+
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+      depth: segH, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.02, bevelSegments: 3
+    });
+    geometry.rotateX(-Math.PI / 2);
+
+    const material = new THREE.MeshPhysicalMaterial({
+      color, metalness: 0.1, roughness: 0.3, clearcoat: 0.4, clearcoatRoughness: 0.2,
+      emissive: color, emissiveIntensity: 0.15, transparent: true, opacity: 0.92,
+    });
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.userData = { index: i, source: src };
+    const mid = angle + sweep / 2;
+    mesh.position.x = Math.cos(mid) * gap;
+    mesh.position.z = Math.sin(mid) * gap;
+    scene.add(mesh);
+    segments3D.push(mesh);
+    angle += sweep;
+  });
+}
+
+let time3d = 0;
+function animate3D() {
+  requestAnimationFrame(animate3D);
+  if (currentView !== '3d' || !renderer) return;
+  time3d += 0.01;
+  currentRotX += (targetRotX - currentRotX) * 0.08;
+  currentRotY += (targetRotY - currentRotY) * 0.08;
+  currentZoom += (targetZoom - currentZoom) * 0.08;
+  camera.position.x = Math.sin(currentRotY) * currentZoom * Math.cos(currentRotX);
+  camera.position.y = Math.sin(currentRotX) * currentZoom;
+  camera.position.z = Math.cos(currentRotY) * currentZoom * Math.cos(currentRotX);
+  camera.lookAt(0, 0, 0);
+  segments3D.forEach((seg, i) => { seg.position.y = Math.sin(time3d + i*0.5) * 0.02; });
+  if (starField) { starField.rotation.y = time3d * 0.02; }
+  renderer.render(scene, camera);
+}
+
+// =============================================
+// UI PANEL
+// =============================================
+let emojiPickerTarget = -1;
+
+function renderPanel(srcs) {
+  const list = document.getElementById('sources-list');
+  const normed = getNormalized(srcs);
+  const rawTotal = srcs.reduce((s, src) => s + src.rawPct, 0);
+  const isSnapshot = activeSnapshotIdx >= 0;
+
+  let html = '';
+  normed.forEach((src, i) => {
+    const color = SEGMENT_COLORS[i % SEGMENT_COLORS.length];
+    html += `
+      <div class="source-item" data-idx="${i}">
+        <div class="source-top">
+          <span class="source-emoji" onclick="openEmojiPicker(${i}, event)" title="Mainīt ikonu">${src.emoji || '🎯'}</span>
+          <input class="source-name" value="${src.name}" ${isSnapshot?'disabled':''} onchange="updateName(${i}, this.value)">
+          <select class="cat-select" onchange="updateCategory(${i}, this.value)" ${isSnapshot?'disabled':''}>
+            <option value="red" ${src.category==='red'?'selected':''}>🔴 Kaitīgs</option>
+            <option value="yellow" ${src.category==='yellow'?'selected':''}>🟡 Neitrāls</option>
+            <option value="green" ${src.category==='green'?'selected':''}>🟢 Veselīgs</option>
+          </select>
+          ${isSnapshot ? '' : `<button class="source-delete" onclick="deleteSource(${i})">✕</button>`}
+        </div>
+        <div class="source-bottom">
+          <input type="range" class="source-slider" min="0" max="50" step="0.5" value="${src.rawPct}"
+            ${isSnapshot?'disabled':''}
+            oninput="updatePct(${i}, parseFloat(this.value))"
+            style="accent-color: ${color}">
+          <input type="number" class="source-pct-input" value="${src.rawPct}" min="0" max="100" step="0.5"
+            ${isSnapshot?'disabled':''}
+            onchange="updatePct(${i}, parseFloat(this.value))">
+          <span class="source-normalized" style="color:${color}">→ ${src.normPct.toFixed(1)}%</span>
+        </div>
+      </div>`;
+  });
+  list.innerHTML = html;
+
+  document.getElementById('raw-total').textContent = rawTotal.toFixed(1) + '%';
+  document.getElementById('norm-total').textContent = '100%';
+  document.getElementById('source-count').textContent = srcs.length + ' avoti';
+
+  const health = getHealthScore(srcs);
+  const scoreEl = document.getElementById('health-score');
+  scoreEl.textContent = health.toFixed(0) + '%';
+  scoreEl.style.color = health >= 60 ? '#22c55e' : health >= 40 ? '#eab308' : '#ef4444';
+}
+
+function openEmojiPicker(idx, e) {
+  if (activeSnapshotIdx >= 0) return;
+  const picker = document.getElementById('emoji-picker');
+  emojiPickerTarget = idx;
+  picker.innerHTML = EMOJI_LIST.map(em =>
+    `<div class="emoji-opt" onclick="pickEmoji('${em}')">${em}</div>`
+  ).join('');
+  picker.classList.remove('hidden');
+  const rect = e.target.getBoundingClientRect();
+  picker.style.left = rect.left + 'px';
+  picker.style.top = (rect.bottom + 4) + 'px';
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', closeEmojiPicker, { once: true });
+  }, 10);
+}
+
+function closeEmojiPicker() {
+  document.getElementById('emoji-picker').classList.add('hidden');
+}
+
+function pickEmoji(em) {
+  if (emojiPickerTarget >= 0) {
+    sources[emojiPickerTarget].emoji = em;
+    refresh();
+  }
+  closeEmojiPicker();
+}
+
+function updatePct(idx, val) {
+  sources[idx].rawPct = Math.max(0, val);
+  refresh();
+}
+function updateName(idx, val) {
+  sources[idx].name = val;
+  saveData();
+  if (currentView === 'wheel') drawWheel();
+}
+function updateCategory(idx, val) {
+  sources[idx].category = val;
+  refresh();
+}
+function deleteSource(idx) {
+  sources.splice(idx, 1);
+  refresh();
+}
+function addSource() {
+  sources.push({ name: 'Jauns avots', rawPct: 5, category: 'green', emoji: '🎯' });
+  refresh();
+  setTimeout(() => {
+    const sc = document.getElementById('sources-list');
+    sc.scrollTop = sc.scrollHeight;
+  }, 50);
+}
+
+function refresh() {
+  saveData();
+  const srcs = getDisplaySources();
+  renderPanel(srcs);
+  if (currentView === '3d') create3DPie(srcs);
+  // wheel redraws on next anim frame
+}
+
+function togglePanel() {
+  const panel = document.getElementById('panel');
+  panel.classList.toggle('hidden');
+  document.getElementById('panel-toggle').textContent = panel.classList.contains('hidden') ? '▶' : '◀';
+}
+
+// =============================================
+// SNAPSHOTS
+// =============================================
+function saveSnapshot() {
+  document.getElementById('snapshot-modal').classList.remove('hidden');
+  document.getElementById('snapshot-label').value = '';
+  document.getElementById('snapshot-note').value = '';
+  document.getElementById('snapshot-label').focus();
+}
+function closeSnapshotModal() {
+  document.getElementById('snapshot-modal').classList.add('hidden');
+}
+function confirmSnapshot() {
+  const label = document.getElementById('snapshot-label').value || 'Bez nosaukuma';
+  const note = document.getElementById('snapshot-note').value;
+  snapshots.push({
+    id: Date.now(),
+    date: new Date().toISOString(),
+    label, note,
+    sources: JSON.parse(JSON.stringify(sources)),
+    healthScore: getHealthScore(sources)
+  });
+  saveData();
+  renderTimeline();
+  closeSnapshotModal();
+}
+
+function renderTimeline() {
+  const container = document.getElementById('snapshots-list');
+  if (snapshots.length === 0) {
+    container.innerHTML = '<span style="font-size:12px; color:var(--text-dim)">Nav momentuzņēmumu. Nospied 📸 lai saglabātu.</span>';
+    return;
+  }
+  let html = `<div class="snapshot-chip ${activeSnapshotIdx===-1?'active':''}" onclick="loadLive()">
+    <span class="snap-date">🔴 Tagad</span></div>`;
+  snapshots.forEach((snap, i) => {
+    const d = new Date(snap.date);
+    const ds = d.toLocaleDateString('lv-LV', { day:'numeric', month:'short', year:'numeric' });
+    html += `<div class="snapshot-chip ${activeSnapshotIdx===i?'active':''}" onclick="loadSnapshot(${i})">
+      <span class="snap-date">${ds}</span>
+      <span class="snap-label">${snap.label} (${snap.healthScore.toFixed(0)}%)</span>
+      <button class="snapshot-delete" onclick="event.stopPropagation(); deleteSnapshot(${i})">✕</button>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function loadSnapshot(idx) {
+  activeSnapshotIdx = idx;
+  const srcs = snapshots[idx].sources;
+  renderPanel(srcs);
+  if (currentView === '3d') create3DPie(srcs);
+  renderTimeline();
+}
+function loadLive() {
+  activeSnapshotIdx = -1;
+  renderPanel(sources);
+  if (currentView === '3d') create3DPie(sources);
+  renderTimeline();
+}
+function deleteSnapshot(idx) {
+  snapshots.splice(idx, 1);
+  if (activeSnapshotIdx === idx) { activeSnapshotIdx = -1; renderPanel(sources); if(currentView==='3d') create3DPie(sources); }
+  else if (activeSnapshotIdx > idx) activeSnapshotIdx--;
+  saveData(); renderTimeline();
+}
+
+// =============================================
+// EXPORT / IMPORT
+// =============================================
+function exportJSON() {
+  const data = { sources, snapshots, exportDate: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'dopamina-aplis-' + new Date().toISOString().split('T')[0] + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function importJSON(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (data.sources) sources = data.sources;
+      if (data.snapshots) snapshots = data.snapshots;
+      activeSnapshotIdx = -1;
+      saveData(); refresh(); renderTimeline();
+    } catch(err) { alert('Kļūda importējot: ' + err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+// =============================================
+// INIT
+// =============================================
+loadData();
+initWheel();
+renderPanel(sources);
+renderTimeline();
+setView('wheel'); // Start with 2D wheel
+
+// Lazy init Three.js only when needed
+animate3D();
+
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
