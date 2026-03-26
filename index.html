@@ -564,6 +564,97 @@
   #tooltip .tt-pct { font-size: 20px; font-weight: 700; }
   #tooltip .tt-raw { font-size: 11px; color: var(--text-dim); }
 
+  /* ===== 3D SEGMENT EDIT POPUP ===== */
+  .seg-edit {
+    position: fixed;
+    z-index: 200;
+    background: rgba(15, 15, 40, 0.96);
+    border: 1px solid var(--accent);
+    border-radius: 14px;
+    padding: 16px;
+    width: 260px;
+    box-shadow: 0 0 30px rgba(124, 58, 237, 0.4), 0 8px 32px rgba(0,0,0,0.6);
+    backdrop-filter: blur(16px);
+    transition: opacity 0.15s, transform 0.15s;
+  }
+  .seg-edit.hidden { display: none; }
+  .seg-edit-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .seg-edit-emoji { font-size: 22px; }
+  .seg-edit-name { font-weight: 600; font-size: 15px; flex: 1; }
+  .seg-edit-close {
+    background: none; border: none; color: var(--text-dim);
+    font-size: 18px; cursor: pointer;
+  }
+  .seg-edit-close:hover { color: var(--red); }
+  .seg-edit-current {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+  .seg-edit-current strong {
+    color: var(--text);
+    font-size: 18px;
+  }
+  .seg-edit-norm {
+    font-size: 11px;
+    margin-left: 6px;
+  }
+  .seg-edit-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .seg-adj-btn {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.05);
+    color: var(--text);
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.15s;
+  }
+  .seg-adj-btn:hover { border-color: var(--accent); }
+  .seg-adj-btn.minus { color: var(--red); }
+  .seg-adj-btn.minus:hover { background: rgba(239,68,68,0.15); }
+  .seg-adj-btn.plus { color: var(--green); }
+  .seg-adj-btn.plus:hover { background: rgba(34,197,94,0.15); }
+  .seg-edit-input {
+    flex: 1;
+    text-align: center;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 18px;
+    font-weight: 700;
+    border-radius: 10px;
+    padding: 8px;
+    width: 60px;
+    font-family: 'Inter', sans-serif;
+  }
+  .seg-edit-apply {
+    width: 100%;
+    padding: 10px;
+    background: var(--accent);
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: background 0.2s;
+  }
+  .seg-edit-apply:hover { background: #6d28d9; }
+
   /* ===== MODAL ===== */
   .modal-overlay {
     position: fixed; inset: 0;
@@ -768,6 +859,27 @@
   <div class="tt-name"></div>
   <div class="tt-pct"></div>
   <div class="tt-raw"></div>
+</div>
+
+<!-- 3D Segment edit popup -->
+<div id="seg-edit" class="seg-edit hidden">
+  <div class="seg-edit-header">
+    <span class="seg-edit-emoji" id="seg-edit-emoji"></span>
+    <span class="seg-edit-name" id="seg-edit-name"></span>
+    <button class="seg-edit-close" onclick="closeSegEdit()">✕</button>
+  </div>
+  <div class="seg-edit-current">
+    Pašreiz: <strong id="seg-edit-pct"></strong>
+    <span class="seg-edit-norm" id="seg-edit-norm"></span>
+  </div>
+  <div class="seg-edit-controls">
+    <button class="seg-adj-btn minus" onclick="segAdjust(-5)">−5</button>
+    <button class="seg-adj-btn minus" onclick="segAdjust(-1)">−1</button>
+    <input type="number" id="seg-edit-input" class="seg-edit-input" value="0" step="1">
+    <button class="seg-adj-btn plus" onclick="segAdjust(+1)">+1</button>
+    <button class="seg-adj-btn plus" onclick="segAdjust(+5)">+5</button>
+  </div>
+  <button class="seg-edit-apply" onclick="applySegEdit()">Piemērot</button>
 </div>
 
 <!-- Side panel -->
@@ -1584,46 +1696,118 @@ function initThree() {
   threeInited = true;
 
   scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.set(0, 2, currentZoom);
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(0, 3, currentZoom);
   camera.lookAt(0, 0, 0);
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.2;
+  renderer.toneMappingExposure = 1.4;
   document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-  scene.add(new THREE.AmbientLight(0x404060, 0.8));
-  const dl = new THREE.DirectionalLight(0xffffff, 1.0);
-  dl.position.set(5, 8, 5);
+  // Improved lighting
+  scene.add(new THREE.AmbientLight(0x6060a0, 0.6));
+  const dl = new THREE.DirectionalLight(0xffffff, 1.2);
+  dl.position.set(4, 10, 6);
+  dl.castShadow = true;
   scene.add(dl);
-  const pl = new THREE.PointLight(0x7c3aed, 2, 15);
-  pl.position.set(0, 3, 0);
+  const dl2 = new THREE.DirectionalLight(0x8888ff, 0.4);
+  dl2.position.set(-4, 5, -3);
+  scene.add(dl2);
+  const pl = new THREE.PointLight(0x7c3aed, 2.5, 20);
+  pl.position.set(0, 4, 0);
   scene.add(pl);
   const pl2 = new THREE.PointLight(0x06b6d4, 1.5, 15);
-  pl2.position.set(-3, -1, 3);
+  pl2.position.set(-4, -1, 4);
   scene.add(pl2);
 
+  // Stars
   const geo = new THREE.BufferGeometry();
-  const positions = new Float32Array(2000 * 3);
-  for (let i = 0; i < 2000; i++) {
+  const positions = new Float32Array(3000 * 3);
+  for (let i = 0; i < 3000; i++) {
     positions[i*3] = (Math.random()-0.5)*80;
     positions[i*3+1] = (Math.random()-0.5)*80;
     positions[i*3+2] = (Math.random()-0.5)*80;
   }
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   starField = new THREE.Points(geo, new THREE.PointsMaterial({
-    color: 0xaaaaff, size: 0.08, transparent: true, opacity: 0.6, sizeAttenuation: true
+    color: 0xaaaaff, size: 0.07, transparent: true, opacity: 0.5, sizeAttenuation: true
   }));
   scene.add(starField);
 
+  // Ground glow ring
+  const ringGeo = new THREE.RingGeometry(2.1, 2.4, 64);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0x7c3aed, transparent: true, opacity: 0.15, side: THREE.DoubleSide
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = -0.01;
+  scene.add(ring);
+
   const canvas = renderer.domElement;
-  canvas.addEventListener('mousedown', on3DMouseDown);
-  canvas.addEventListener('mousemove', on3DMouseMove);
-  canvas.addEventListener('mouseup', () => isDragging = false);
-  canvas.addEventListener('wheel', e => { e.preventDefault(); targetZoom = Math.max(3, Math.min(12, targetZoom + e.deltaY * 0.003)); }, { passive: false });
+  let dragMoved = false;
+  canvas.addEventListener('mousedown', e => {
+    isDragging = true; dragMoved = false;
+    dragStartX = e.clientX; dragStartY = e.clientY;
+    dragStartRotX = targetRotX; dragStartRotY = targetRotY;
+  });
+  canvas.addEventListener('mousemove', e => {
+    mouseX = e.clientX; mouseY = e.clientY;
+    if (isDragging) {
+      const dx = e.clientX - dragStartX, dy = e.clientY - dragStartY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
+      targetRotY = dragStartRotY + dx * 0.005;
+      targetRotX = Math.max(-0.3, Math.min(1.3, dragStartRotX + dy * 0.005));
+    }
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    check3DHover();
+  });
+  canvas.addEventListener('mouseup', e => {
+    isDragging = false;
+    if (!dragMoved) click3DSegment(e.clientX, e.clientY);
+  });
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    targetZoom = Math.max(2.5, Math.min(10, targetZoom + e.deltaY * 0.003));
+  }, { passive: false });
+
+  // Touch support
+  let touchStartTime = 0, touchMoved = false;
+  canvas.addEventListener('touchstart', e => {
+    if (e.touches.length === 1) {
+      isDragging = true; touchMoved = false;
+      touchStartTime = Date.now();
+      dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY;
+      dragStartRotX = targetRotX; dragStartRotY = targetRotY;
+    }
+    e.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener('touchmove', e => {
+    if (e.touches.length === 1 && isDragging) {
+      const dx = e.touches[0].clientX - dragStartX, dy = e.touches[0].clientY - dragStartY;
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) touchMoved = true;
+      targetRotY = dragStartRotY + dx * 0.005;
+      targetRotX = Math.max(-0.3, Math.min(1.3, dragStartRotX + dy * 0.005));
+    }
+    e.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener('touchend', e => {
+    isDragging = false;
+    if (!touchMoved && (Date.now() - touchStartTime) < 300) {
+      const t = e.changedTouches[0];
+      // Set mouse for raycaster
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((t.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((t.clientY - rect.top) / rect.height) * 2 + 1;
+      click3DSegment(t.clientX, t.clientY);
+    }
+  });
+
   window.addEventListener('resize', () => {
     if (!renderer) return;
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -1632,23 +1816,7 @@ function initThree() {
   });
 }
 
-function on3DMouseDown(e) {
-  isDragging = true;
-  dragStartX = e.clientX; dragStartY = e.clientY;
-  dragStartRotX = targetRotX; dragStartRotY = targetRotY;
-}
-function on3DMouseMove(e) {
-  mouseX = e.clientX; mouseY = e.clientY;
-  if (isDragging) {
-    targetRotY = dragStartRotY + (e.clientX - dragStartX) * 0.005;
-    targetRotX = Math.max(-0.5, Math.min(1.2, dragStartRotX + (e.clientY - dragStartY) * 0.005));
-  }
-  const rect = renderer.domElement.getBoundingClientRect();
-  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-  check3DHover();
-}
-
+// 3D hover
 function check3DHover() {
   raycaster.setFromCamera(mouse, camera);
   const intersects = raycaster.intersectObjects(segments3D);
@@ -1658,46 +1826,112 @@ function check3DHover() {
     const src = obj.userData.source;
     const idx = obj.userData.index;
     if (hoveredSegment !== idx) {
-      segments3D.forEach(s => { if(s.material){ s.material.emissiveIntensity=0.15; s.material.opacity=0.92; }});
+      segments3D.forEach(s => { if(s.material){ s.material.emissiveIntensity=0.12; s.material.opacity=0.88; }});
       obj.material.emissiveIntensity = 0.5;
       obj.material.opacity = 1.0;
       hoveredSegment = idx;
-      document.querySelectorAll('.source-item').forEach((el,i)=>el.classList.toggle('highlight',i===idx));
     }
     tooltip.querySelector('.tt-name').textContent = (src.emoji||'') + ' ' + src.name;
     tooltip.querySelector('.tt-pct').textContent = src.normPct.toFixed(1) + '%';
-    tooltip.querySelector('.tt-raw').textContent = 'Ievadītais: ' + src.rawPct + '% | ' + CATEGORY_COLORS[src.category].label;
+    tooltip.querySelector('.tt-raw').textContent = 'Ievadītais: ' + src.rawPct + '% → Klikšķini lai mainītu';
     tooltip.style.left = (mouseX+16)+'px';
     tooltip.style.top = (mouseY-16)+'px';
     tooltip.classList.add('visible');
     renderer.domElement.style.cursor = 'pointer';
   } else {
     if (hoveredSegment !== -1) {
-      segments3D.forEach(s => { if(s.material){ s.material.emissiveIntensity=0.15; s.material.opacity=0.92; }});
+      segments3D.forEach(s => { if(s.material){ s.material.emissiveIntensity=0.12; s.material.opacity=0.88; }});
       hoveredSegment = -1;
-      document.querySelectorAll('.source-item').forEach(el=>el.classList.remove('highlight'));
     }
     tooltip.classList.remove('visible');
     renderer.domElement.style.cursor = 'grab';
   }
 }
 
+// 3D click → open edit popup
+let segEditIdx = -1;
+let segEditSourceIdx = -1;
+
+function click3DSegment(screenX, screenY) {
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(segments3D);
+  if (intersects.length > 0) {
+    const obj = intersects[0].object;
+    const src = obj.userData.source;
+    segEditIdx = obj.userData.index;
+    // Find actual source index by name
+    segEditSourceIdx = sources.findIndex(s => s.name === src.name);
+    if (segEditSourceIdx < 0) return;
+
+    const el = document.getElementById('seg-edit');
+    document.getElementById('seg-edit-emoji').textContent = src.emoji || '🎯';
+    document.getElementById('seg-edit-name').textContent = src.name;
+    updateSegEditDisplay();
+    document.getElementById('seg-edit-input').value = 0;
+
+    // Position popup near click
+    const popW = 260, popH = 200;
+    let left = screenX + 20;
+    let top = screenY - popH / 2;
+    if (left + popW > window.innerWidth - 20) left = screenX - popW - 20;
+    if (top < 60) top = 60;
+    if (top + popH > window.innerHeight - 90) top = window.innerHeight - 90 - popH;
+    el.style.left = left + 'px';
+    el.style.top = top + 'px';
+    el.classList.remove('hidden');
+  }
+}
+
+function updateSegEditDisplay() {
+  if (segEditSourceIdx < 0) return;
+  const src = sources[segEditSourceIdx];
+  const normed = getNormalized(sources);
+  const norm = normed[segEditSourceIdx];
+  document.getElementById('seg-edit-pct').textContent = src.rawPct + '%';
+  document.getElementById('seg-edit-norm').textContent = '(→ ' + (norm ? norm.normPct.toFixed(1) : '0') + '% normalizēts)';
+}
+
+function segAdjust(delta) {
+  if (segEditSourceIdx < 0) return;
+  const input = document.getElementById('seg-edit-input');
+  input.value = parseInt(input.value || 0) + delta;
+}
+
+function applySegEdit() {
+  if (segEditSourceIdx < 0) return;
+  const delta = parseFloat(document.getElementById('seg-edit-input').value) || 0;
+  if (delta === 0) { closeSegEdit(); return; }
+  sources[segEditSourceIdx].rawPct = Math.max(0, sources[segEditSourceIdx].rawPct + delta);
+  closeSegEdit();
+  refresh();
+}
+
+function closeSegEdit() {
+  document.getElementById('seg-edit').classList.add('hidden');
+  segEditIdx = -1;
+  segEditSourceIdx = -1;
+}
+
+// Create 3D pie
 function create3DPie(srcs) {
   if (!threeInited) initThree();
   segments3D.forEach(s => scene.remove(s));
   segments3D = [];
   const normed = getNormalized(srcs);
   let angle = -Math.PI / 2;
-  const radius = 2.0, height = 0.5, gap = 0.015;
+  const radius = 2.0, baseHeight = 0.35, gap = 0.02;
 
   normed.forEach((src, i) => {
     if (src.normPct <= 0) return;
     const sweep = (src.normPct / 100) * Math.PI * 2;
-    const color = new THREE.Color(SEGMENT_COLORS[i % SEGMENT_COLORS.length]);
-    const segH = height + (src.normPct / 100) * 0.8;
+    const colorHex = SEGMENT_COLORS[i % SEGMENT_COLORS.length];
+    const color = new THREE.Color(colorHex);
+    // Height proportional to percentage — more dramatic
+    const segH = baseHeight + (src.normPct / 100) * 1.2;
+    const isHovered = (i === hoveredSegment);
 
     const shape = new THREE.Shape();
-    const segs = Math.max(16, Math.floor(sweep / 0.05));
+    const segs = Math.max(24, Math.floor(sweep / 0.03));
     shape.moveTo(0, 0);
     for (let j = 0; j <= segs; j++) {
       const a = angle + (sweep * j / segs);
@@ -1706,17 +1940,29 @@ function create3DPie(srcs) {
     shape.lineTo(0, 0);
 
     const geometry = new THREE.ExtrudeGeometry(shape, {
-      depth: segH, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.02, bevelSegments: 3
+      depth: segH,
+      bevelEnabled: true,
+      bevelThickness: 0.04,
+      bevelSize: 0.03,
+      bevelSegments: 4
     });
     geometry.rotateX(-Math.PI / 2);
 
     const material = new THREE.MeshPhysicalMaterial({
-      color, metalness: 0.1, roughness: 0.3, clearcoat: 0.4, clearcoatRoughness: 0.2,
-      emissive: color, emissiveIntensity: 0.15, transparent: true, opacity: 0.92,
+      color,
+      metalness: 0.15,
+      roughness: 0.25,
+      clearcoat: 0.6,
+      clearcoatRoughness: 0.15,
+      emissive: color,
+      emissiveIntensity: 0.12,
+      transparent: true,
+      opacity: 0.88,
     });
 
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.userData = { index: i, source: src };
+    mesh.userData = { index: i, source: src, sourceIdx: sources.findIndex(s => s.name === src.name) };
+    // Push segments outward slightly for gap
     const mid = angle + sweep / 2;
     mesh.position.x = Math.cos(mid) * gap;
     mesh.position.z = Math.sin(mid) * gap;
@@ -1731,15 +1977,20 @@ function animate3D() {
   requestAnimationFrame(animate3D);
   if (currentView !== '3d' || !renderer) return;
   time3d += 0.01;
-  currentRotX += (targetRotX - currentRotX) * 0.08;
-  currentRotY += (targetRotY - currentRotY) * 0.08;
-  currentZoom += (targetZoom - currentZoom) * 0.08;
+  currentRotX += (targetRotX - currentRotX) * 0.1;
+  currentRotY += (targetRotY - currentRotY) * 0.1;
+  currentZoom += (targetZoom - currentZoom) * 0.1;
   camera.position.x = Math.sin(currentRotY) * currentZoom * Math.cos(currentRotX);
   camera.position.y = Math.sin(currentRotX) * currentZoom;
   camera.position.z = Math.cos(currentRotY) * currentZoom * Math.cos(currentRotX);
   camera.lookAt(0, 0, 0);
-  segments3D.forEach((seg, i) => { seg.position.y = Math.sin(time3d + i*0.5) * 0.02; });
-  if (starField) { starField.rotation.y = time3d * 0.02; }
+
+  // Gentle float animation
+  segments3D.forEach((seg, i) => {
+    const base = seg.userData.source.normPct > 0 ? 0 : -0.5;
+    seg.position.y = base + Math.sin(time3d * 0.8 + i * 0.4) * 0.015;
+  });
+  if (starField) { starField.rotation.y = time3d * 0.015; }
   renderer.render(scene, camera);
 }
 
