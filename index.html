@@ -1248,17 +1248,25 @@ function angleFromCenter(px, py) {
   return Math.atan2(py - c.y, px - c.x);
 }
 
-let wheelDragStartAngle = 0;
+// Normalize angle delta to avoid ±π jump at 9 o'clock position
+function normalizeAngle(a) {
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
+}
+
+let wheelLastAngle = 0;
 
 function onWheelMouseDown(e) {
   wheelDragging = true;
-  wheelDragStartAngle = angleFromCenter(e.clientX, e.clientY);
-  wheelDragStartRot = wheelTargetRotation;
+  wheelLastAngle = angleFromCenter(e.clientX, e.clientY);
 }
 function onWheelMouseMove(e) {
   if (wheelDragging) {
     const currentAngle = angleFromCenter(e.clientX, e.clientY);
-    wheelTargetRotation = wheelDragStartRot + (currentAngle - wheelDragStartAngle);
+    const delta = normalizeAngle(currentAngle - wheelLastAngle);
+    wheelTargetRotation += delta;
+    wheelLastAngle = currentAngle;
   }
   checkWheelHover(e.clientX, e.clientY);
 }
@@ -1273,8 +1281,7 @@ function onWheelTouchStart(e) {
   e.preventDefault();
   if (e.touches.length === 1) {
     wheelDragging = true;
-    wheelDragStartAngle = angleFromCenter(e.touches[0].clientX, e.touches[0].clientY);
-    wheelDragStartRot = wheelTargetRotation;
+    wheelLastAngle = angleFromCenter(e.touches[0].clientX, e.touches[0].clientY);
   } else if (e.touches.length === 2) {
     wheelTouchDist = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
@@ -1286,7 +1293,9 @@ function onWheelTouchMove(e) {
   e.preventDefault();
   if (e.touches.length === 1 && wheelDragging) {
     const currentAngle = angleFromCenter(e.touches[0].clientX, e.touches[0].clientY);
-    wheelTargetRotation = wheelDragStartRot + (currentAngle - wheelDragStartAngle);
+    const delta = normalizeAngle(currentAngle - wheelLastAngle);
+    wheelTargetRotation += delta;
+    wheelLastAngle = currentAngle;
   } else if (e.touches.length === 2) {
     const dist = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
