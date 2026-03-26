@@ -664,6 +664,18 @@
 <!-- Emoji picker (shared) -->
 <div class="emoji-picker hidden" id="emoji-picker"></div>
 
+<!-- Confirm delete modal -->
+<div class="modal-overlay hidden" id="confirm-modal">
+  <div class="modal" style="text-align:center;">
+    <h3 id="confirm-title" style="margin-bottom:8px;">Apstiprināt dzēšanu?</h3>
+    <p id="confirm-message" style="color:var(--text-dim);font-size:13px;margin-bottom:20px;"></p>
+    <div class="modal-actions" style="justify-content:center;">
+      <button class="btn" onclick="closeConfirm()">Atcelt</button>
+      <button class="btn" style="background:rgba(239,68,68,0.3);border-color:rgba(239,68,68,0.5);color:#fca5a5;" onclick="doConfirm()">Dzēst</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // =============================================
 // DATA
@@ -1546,6 +1558,28 @@ function saveSnapshot() {
 }
 function closeSnapshotModal() {
   document.getElementById('snapshot-modal').classList.add('hidden');
+}
+
+// =============================================
+// CONFIRM DIALOG
+// =============================================
+let confirmCallback = null;
+
+function showConfirm(title, message, onConfirm) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-message').textContent = message;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  confirmCallback = onConfirm;
+}
+
+function closeConfirm() {
+  document.getElementById('confirm-modal').classList.add('hidden');
+  confirmCallback = null;
+}
+
+function doConfirm() {
+  if (confirmCallback) confirmCallback();
+  closeConfirm();
 }
 function confirmSnapshot() {
   const label = document.getElementById('snapshot-label').value || 'Bez nosaukuma';
