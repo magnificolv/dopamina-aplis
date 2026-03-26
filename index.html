@@ -1368,13 +1368,20 @@ function normalizeAngle(a) {
 }
 
 let wheelLastAngle = 0;
+let wheelMouseStartX = 0, wheelMouseStartY = 0, wheelMouseMoved = false;
 
 function onWheelMouseDown(e) {
   wheelDragging = true;
+  wheelMouseMoved = false;
+  wheelMouseStartX = e.clientX;
+  wheelMouseStartY = e.clientY;
   wheelLastAngle = angleFromCenter(e.clientX, e.clientY);
 }
 function onWheelMouseMove(e) {
   if (wheelDragging) {
+    const dx = e.clientX - wheelMouseStartX;
+    const dy = e.clientY - wheelMouseStartY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) wheelMouseMoved = true;
     const currentAngle = angleFromCenter(e.clientX, e.clientY);
     const delta = normalizeAngle(currentAngle - wheelLastAngle);
     wheelTargetRotation += delta;
@@ -1382,17 +1389,27 @@ function onWheelMouseMove(e) {
   }
   checkWheelHover(e.clientX, e.clientY);
 }
-function onWheelMouseUp() { wheelDragging = false; }
+function onWheelMouseUp(e) {
+  if (wheelDragging && !wheelMouseMoved) {
+    clickWheelSegment(e.clientX, e.clientY);
+  }
+  wheelDragging = false;
+}
 function onWheelScroll(e) {
   e.preventDefault();
   wheelTargetZoom = Math.max(0.5, Math.min(2.5, wheelTargetZoom - e.deltaY * 0.001));
 }
 
 let wheelTouchDist = 0;
+let wheelTouchStartX = 0, wheelTouchStartY = 0, wheelTouchMoved = false, wheelTouchStartTime = 0;
 function onWheelTouchStart(e) {
   e.preventDefault();
   if (e.touches.length === 1) {
     wheelDragging = true;
+    wheelTouchMoved = false;
+    wheelTouchStartTime = Date.now();
+    wheelTouchStartX = e.touches[0].clientX;
+    wheelTouchStartY = e.touches[0].clientY;
     wheelLastAngle = angleFromCenter(e.touches[0].clientX, e.touches[0].clientY);
   } else if (e.touches.length === 2) {
     wheelTouchDist = Math.hypot(
@@ -1404,6 +1421,9 @@ function onWheelTouchStart(e) {
 function onWheelTouchMove(e) {
   e.preventDefault();
   if (e.touches.length === 1 && wheelDragging) {
+    const dx = e.touches[0].clientX - wheelTouchStartX;
+    const dy = e.touches[0].clientY - wheelTouchStartY;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) wheelTouchMoved = true;
     const currentAngle = angleFromCenter(e.touches[0].clientX, e.touches[0].clientY);
     const delta = normalizeAngle(currentAngle - wheelLastAngle);
     wheelTargetRotation += delta;
@@ -1417,7 +1437,12 @@ function onWheelTouchMove(e) {
     wheelTouchDist = dist;
   }
 }
-function onWheelTouchEnd() { wheelDragging = false; }
+function onWheelTouchEnd(e) {
+  if (wheelDragging && !wheelTouchMoved && (Date.now() - wheelTouchStartTime) < 300) {
+    clickWheelSegment(wheelTouchStartX, wheelTouchStartY);
+  }
+  wheelDragging = false;
+}
 
 function checkWheelHover(mx, my) {
   const srcs = getNormalized(getDisplaySources());
@@ -1453,7 +1478,7 @@ function checkWheelHover(mx, my) {
       const src = srcs[found];
       tooltip.querySelector('.tt-name').textContent = src.emoji + ' ' + src.name;
       tooltip.querySelector('.tt-pct').textContent = src.normPct.toFixed(1) + '%';
-      tooltip.querySelector('.tt-raw').textContent = 'Ievadītais: ' + src.rawPct + '% | ' + CATEGORY_COLORS[src.category].label;
+      tooltip.querySelector('.tt-raw').textContent = 'Ievadītais: ' + src.rawPct + '% → Klikšķini lai mainītu';
       document.querySelectorAll('.source-item').forEach((el, i) => el.classList.toggle('highlight', i === found));
     }
     if (found >= 0) {
@@ -1473,6 +1498,72 @@ function checkWheelHover(mx, my) {
     wheelCanvas.style.cursor = wheelDragging ? 'grabbing' : 'grab';
     document.querySelectorAll('.source-item').forEach(el => el.classList.remove('highlight'));
   }
+}
+
+// 2D wheel click → open edit popup (same as 3D)
+function clickWheelSegment(screenX, screenY) {
+  const srcs = getNormalized(getDisplaySources());
+  const mobile = isMobile();
+  const panelVisible = !mobile && !document.getElementById('panel').classList.contains('hidden');
+  const panelW = panelVisible ? 380 : 0;
+  const topH = mobile ? 48 : 0;
+  const botH = mobile ? 56 : 0;
+  const cx = (window.innerWidth - panelW) / 2;
+  const cy = mobile ? topH + (window.innerHeight - topH - botH) / 2 : window.innerHeight / 2;
+  const availH = mobile ? (window.innerHeight - topH - botH) : window.innerHeight;
+  const baseR = Math.min((window.innerWidth - panelW) / 2 - 30, availH / 2 - 40) * (mobile ? 0.62 : 0.72) * wheelZoom;
+  const innerR = baseR * 0.38;
+  const outerR = baseR;
+
+  const dx = screenX - cx;
+  const dy = screenY - cy;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < innerR || dist > outerR * 1.15) return;
+
+  let angle = Math.atan2(dy, dx) - wheelRotation;
+  angle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+
+  let cumAngle = 0;
+  let found = -1;
+  for (let i = 0; i < srcs.length; i++) {
+    if (srcs[i].normPct <= 0) continue;
+    const sweep = (srcs[i].normPct / 100) * Math.PI * 2;
+    if (angle >= cumAngle && angle < cumAngle + sweep) {
+      found = i;
+      break;
+    }
+    cumAngle += sweep;
+  }
+
+  if (found < 0) return;
+
+  // Find actual source index
+  const src = srcs[found];
+  const srcIdx = sources.findIndex(s => s.name === src.name);
+  if (srcIdx < 0) return;
+
+  // Open edit popup (reuse 3D popup)
+  segEditSourceIdx = srcIdx;
+  segEditIdx = found;
+  const el = document.getElementById('seg-edit');
+  document.getElementById('seg-edit-emoji').textContent = src.emoji || '🎯';
+  document.getElementById('seg-edit-name').textContent = src.name;
+  updateSegEditDisplay();
+  document.getElementById('seg-edit-input').value = 0;
+
+  // Position popup near click
+  const popW = 260, popH = 200;
+  let left = screenX + 20;
+  let top = screenY - popH / 2;
+  if (left + popW > window.innerWidth - 20) left = screenX - popW - 20;
+  if (top < 60) top = 60;
+  if (top + popH > window.innerHeight - 90) top = window.innerHeight - 90 - popH;
+  el.style.left = left + 'px';
+  el.style.top = top + 'px';
+  el.classList.remove('hidden');
+
+  // Hide tooltip
+  document.getElementById('tooltip').classList.remove('visible');
 }
 
 function animateWheel() {
@@ -1912,23 +2003,58 @@ function closeSegEdit() {
   segEditSourceIdx = -1;
 }
 
+// Compute visual angles: enforce minimum angle so small segments stay clickable
+function computeVisualAngles(normed) {
+  const MIN_DEG = 8; // minimum degrees per visible segment
+  const MIN_RAD = MIN_DEG * Math.PI / 180;
+  const TWO_PI = Math.PI * 2;
+  const visible = normed.filter(s => s.normPct > 0);
+  if (visible.length === 0) return normed.map(() => 0);
+
+  // First pass: calculate raw sweeps and find which need boosting
+  const rawSweeps = normed.map(s => s.normPct > 0 ? (s.normPct / 100) * TWO_PI : 0);
+  let totalStolen = 0;
+  const boosted = rawSweeps.map(sw => {
+    if (sw > 0 && sw < MIN_RAD) {
+      totalStolen += MIN_RAD - sw;
+      return MIN_RAD;
+    }
+    return sw;
+  });
+
+  // Steal proportionally from segments larger than MIN_RAD
+  if (totalStolen > 0) {
+    const largeSum = boosted.reduce((s, sw) => sw > MIN_RAD ? s + sw : s, 0);
+    if (largeSum > 0) {
+      for (let i = 0; i < boosted.length; i++) {
+        if (boosted[i] > MIN_RAD) {
+          boosted[i] -= totalStolen * (boosted[i] / largeSum);
+          if (boosted[i] < MIN_RAD) boosted[i] = MIN_RAD;
+        }
+      }
+    }
+  }
+  return boosted;
+}
+
 // Create 3D pie
 function create3DPie(srcs) {
   if (!threeInited) initThree();
   segments3D.forEach(s => scene.remove(s));
   segments3D = [];
   const normed = getNormalized(srcs);
+  const visualSweeps = computeVisualAngles(normed);
   let angle = -Math.PI / 2;
   const radius = 2.0, baseHeight = 0.35, gap = 0.02;
 
   normed.forEach((src, i) => {
     if (src.normPct <= 0) return;
-    const sweep = (src.normPct / 100) * Math.PI * 2;
+    const sweep = visualSweeps[i];
+    if (sweep <= 0) return;
     const colorHex = SEGMENT_COLORS[i % SEGMENT_COLORS.length];
     const color = new THREE.Color(colorHex);
-    // Height proportional to percentage — more dramatic
-    const segH = baseHeight + (src.normPct / 100) * 1.2;
-    const isHovered = (i === hoveredSegment);
+    // Height proportional to percentage — more dramatic, with minimum
+    const segH = Math.max(0.3, baseHeight + (src.normPct / 100) * 1.2);
 
     const shape = new THREE.Shape();
     const segs = Math.max(24, Math.floor(sweep / 0.03));
