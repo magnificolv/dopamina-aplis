@@ -1229,15 +1229,36 @@ function resizeWheelCanvas() {
   wheelCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
+// Get wheel center point for radial rotation
+function getWheelCenter() {
+  const mob = isMobile();
+  const panelVisible = !mob && !document.getElementById('panel').classList.contains('hidden');
+  const panelW = panelVisible ? 380 : 0;
+  const topH = mob ? 48 : 0;
+  const botH = mob ? 56 : 0;
+  return {
+    x: (window.innerWidth - panelW) / 2,
+    y: mob ? topH + (window.innerHeight - topH - botH) / 2 : window.innerHeight / 2
+  };
+}
+
+// Calculate angle from center to point
+function angleFromCenter(px, py) {
+  const c = getWheelCenter();
+  return Math.atan2(py - c.y, px - c.x);
+}
+
+let wheelDragStartAngle = 0;
+
 function onWheelMouseDown(e) {
   wheelDragging = true;
-  wheelDragStartX = e.clientX;
+  wheelDragStartAngle = angleFromCenter(e.clientX, e.clientY);
   wheelDragStartRot = wheelTargetRotation;
 }
 function onWheelMouseMove(e) {
   if (wheelDragging) {
-    const dx = e.clientX - wheelDragStartX;
-    wheelTargetRotation = wheelDragStartRot + dx * 0.003;
+    const currentAngle = angleFromCenter(e.clientX, e.clientY);
+    wheelTargetRotation = wheelDragStartRot + (currentAngle - wheelDragStartAngle);
   }
   checkWheelHover(e.clientX, e.clientY);
 }
@@ -1252,7 +1273,7 @@ function onWheelTouchStart(e) {
   e.preventDefault();
   if (e.touches.length === 1) {
     wheelDragging = true;
-    wheelDragStartX = e.touches[0].clientX;
+    wheelDragStartAngle = angleFromCenter(e.touches[0].clientX, e.touches[0].clientY);
     wheelDragStartRot = wheelTargetRotation;
   } else if (e.touches.length === 2) {
     wheelTouchDist = Math.hypot(
@@ -1264,8 +1285,8 @@ function onWheelTouchStart(e) {
 function onWheelTouchMove(e) {
   e.preventDefault();
   if (e.touches.length === 1 && wheelDragging) {
-    const dx = e.touches[0].clientX - wheelDragStartX;
-    wheelTargetRotation = wheelDragStartRot + dx * 0.003;
+    const currentAngle = angleFromCenter(e.touches[0].clientX, e.touches[0].clientY);
+    wheelTargetRotation = wheelDragStartRot + (currentAngle - wheelDragStartAngle);
   } else if (e.touches.length === 2) {
     const dist = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
@@ -1334,7 +1355,7 @@ function checkWheelHover(mx, my) {
 }
 
 function animateWheel() {
-  wheelRotation += (wheelTargetRotation - wheelRotation) * 0.08;
+  wheelRotation += (wheelTargetRotation - wheelRotation) * 0.18;
   wheelZoom += (wheelTargetZoom - wheelZoom) * 0.08;
   if (currentView === 'wheel') drawWheel();
   wheelAnimFrame = requestAnimationFrame(animateWheel);
